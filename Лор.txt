@@ -1,0 +1,89 @@
+VSP -> Local прокси для БД Postgres через socat (PS Решение очень медленное, пинг 900)
+
+***VSP***
+Устанавливаем службу прокси для БД
+sudo apt install socat -y
+
+Заворачиваем в службу следующую команду (sudo socat TCP-LISTEN:55433,fork TCP:10.66.66.2:5432)
+
+sudo nano /etc/systemd/system/pg-proxy.service
+
+[Unit]
+Description=PostgreSQL Proxy via socat
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/socat TCP-LISTEN:55433,fork TCP:10.66.66.2:5432
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+Активируем сервис
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now pg-proxy
+sudo systemctl status pg-proxy
+
+***Local***
+БД map_db
+Пользователь map
+
+В postgresql.conf ставим 
+listen_addresses = '*'
+
+В pg_hba.conf добавляем 
+host    all    all    89.110.95.46/32    md5
+
+И перезапускаем
+sudo systemctl restart postgresql
+
+***Доп проверки***
+Проверк доступонсть сервиса со стороны VSP
+nc -zv 10.66.66.2 5432
+
+Проверка со стороны Local
+ss -tulnp | grep 5432
+
+
+VSP -> Local прокси для БД Postgres через nginx (PS Также медленно, но похуй, оставлю его)
+
+***VSP***
+Установить nginx с поддержкой stream (через официальный PPA)
+sudo apt update
+sudo apt install curl gnupg2 ca-certificates lsb-release -y
+
+# Добавляем официальный репозиторий nginx
+echo "deb http://nginx.org/packages/ubuntu $(lsb_release -cs) nginx" | sudo tee /etc/apt/sources.list.d/nginx.list
+curl -fsSL https://nginx.org/keys/nginx_signing.key | sudo gpg --dearmor -o /usr/share/keyrings/nginx-archive-keyring.gpg
+sudo nano /etc/apt/sources.list.d/nginx.list - Заменяем содержимое на
+deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu noble nginx
+deb-src [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu noble nginx
+
+sudo apt update
+sudo apt install nginx -y
+nginx -V 2>&1 | grep -o with-stream
+
+sudo nano /etc/nginx/nginx.conf
+stream {
+    upstream pg_backend {
+        server 10.66.66.2:5432;
+    }
+
+    server {
+        listen 55433;
+        proxy_pass pg_backend;
+
+        #access_log /var/log/nginx/pg-stream-access.log;
+        #error_log /var/log/nginx/pg-stream-error.log;
+    }
+}
+
+sudo nginx -t
+sudo systemctl restart nginx
+
+***Local***
+Также как и в первом методе
