@@ -392,3 +392,57 @@ def map_api(request):
 }
 
 }
+
+{Создаем проект на сервере
+Создание проекта Django
+django-admin startproject map
+
+Создание приложения
+cd map/
+python manage.py startapp map_app
+
+
+
+}
+
+{Добавляем аутентификацию админа
+python manage.py createsuperuser - Задаем adminmap, пароль классика с !
+
+В map_app/views.py добавляем
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
+
+@login_required
+
+И теперь http://localhost:8000/admin/
+}
+
+{Разрешаем добавлять полигоны только админу
+Как то где то потыкал и разрашил, см main.js и views.py
+}
+
+
+
+
+
+
+
+{Создаем виртуальное окружение
+python -m venv venv
+source venv/bin/activate #Заходим в виртуальное окружение
+pip install Django psycopg2-binary 
+django-admin startproject map 
+deactivate #Выходим извиртуального окружения
+}
+
+{Стартуем/тормозим сервер
+source venv/bin/activate #Заходим в виртуальное окружение
+python manage.py runserver
+
+Подключаемся через Windows для отладки
+ssh -L 8000:localhost:8000 -p 2222 orangepi@77.238.248.177
+
+http://localhost:8000
+
+deactivate #Выходим извиртуального окружения
+}

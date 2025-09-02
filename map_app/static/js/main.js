@@ -1,18 +1,22 @@
 // map/map_app/static/js/main.js
 // Функция для получения CSRF-токена из куки
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.startsWith(name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
+//function getCookie(name) {
+//    let cookieValue = null;
+//    if (document.cookie && document.cookie !== '') {
+//        const cookies = document.cookie.split(';');
+//        for (let i = 0; i < cookies.length; i++) {
+//            const cookie = cookies[i].trim();
+//            if (cookie.startsWith(name + '=')) {
+//                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+//                break;
+//            }
+//        }
+//    }
+//    return cookieValue;
+//}
+
+function getCSRFToken() {
+    return document.querySelector('[name="csrfmiddlewaretoken"]').value;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -67,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Загрузка объектов из базы данных при загрузке страницы
-    fetch('/api/map_objects/')
+    fetch('/api/map_objects/get/')
         .then(response => {
             if (!response.ok) {
                 throw new Error('Не удалось загрузить данные карты');
@@ -87,8 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
         drawnItems.addLayer(layer);
 
         // Отправка GeoJSON данных на сервер Django
-        const csrftoken = getCookie('csrftoken');
-        fetch('/api/map_objects/', {
+        const csrftoken = getCSRFToken();
+        fetch('/api/map_objects/create/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

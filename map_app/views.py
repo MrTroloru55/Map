@@ -1,9 +1,10 @@
-# map/map_app/views.py
 import json
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.core.serializers import serialize
 from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods
 
 from .models import MapObject
 
@@ -13,51 +14,40 @@ def map_page(request):
     """
     return render(request, 'map.html')
 
-def map_api(request):
+# GET-запросы разрешены для всех пользователей (даже неавторизованных)
+@require_http_methods(["GET"])
+def get_map_objects(request):
     """
-    API для работы с объектами на карте.
-    - GET: возвращает все объекты в формате GeoJSON.
-    - POST: сохраняет новый объект.
+    API для получения всех объектов карты. Доступен для всех.
     """
-    if request.method == 'GET':
-        # Сериализуем все объекты из базы данных в формат GeoJSON
-        queryset = MapObject.objects.all()
-        # use_natural_primary_keys=True
-        geojson_data = serialize('geojson', queryset, geometry_field='geometry', fields=('name', 'description', 'photo_url'))
-        return JsonResponse(json.loads(geojson_data), safe=False)
+    queryset = MapObject.objects.all()
+    # Добавлен 'trip_name' в список полей для сериализации
+    geojson_data = serialize('geojson', queryset, geometry_field='geometry', fields=('id', 'name', 'description', 'photo_url', 'trip_name'))
+    return JsonResponse(json.loads(geojson_data), safe=False)
 
-    elif request.method == 'POST':
+# POST-запросы разрешены только для авторизованных администраторов
+@require_http_methods(["POST"])
+@login_required
+def create_map_object(request):
+    if request.user.is_superuser:
         try:
-            # Загружаем JSON-тело запроса
             data = json.loads(request.body.decode('utf-8'))
-            
-            # Извлекаем тип и координаты геометрии
-            geom_type = data['geometry']['type']
-            coords = data['geometry']['coordinates']
-
-            # Создаем объект GEOSGeometry
-            # GeoJSON формат.
-            geom = GEOSGeometry(json.dumps({'type': geom_type, 'coordinates': coords}))
-            
-            # Извлекаем свойства объекта
+            geom = GEOSGeometry(json.dumps(data['geometry']))
             properties = data.get('properties', {})
-            name = properties.get('name', 'Новый объект')
-            description = properties.get('description', '')
-            photo_url = properties.get('photo_url', '')
-
-            # Создаем и сохраняем новый объект в базе данных
+            trip_name = properties.get('trip_name', 'Поездка 1')
+            
             new_object = MapObject.objects.create(
-                name=name,
-                description=description,
+                name=properties.get('name', 'Новый объект'),
+                description=properties.get('description', ''),
                 geometry=geom,
-                photo_url=photo_url
+                photo_url=properties.get('photo_url', ''),
+                trip_name=trip_name
             )
             
-            # Сериализуем созданный объект и возвращаем ответ
-            geojson_object = serialize('geojson', [new_object], geometry_field='geometry', fields=('name', 'description', 'photo_url'))
+            geojson_object = serialize('geojson', [new_object], geometry_field='geometry', fields=('id', 'name', 'description', 'photo_url', 'trip_name'))
             return JsonResponse(json.loads(geojson_object), status=201)
-
+        
         except (json.JSONDecodeError, KeyError) as e:
             return JsonResponse({'error': f'Неверный формат данных: {e}'}, status=400)
-    
-    return JsonResponse({'error': 'Метод не поддерживается'}, status=405)
+    else:
+        return JsonResponse({'error': 'У вас нет прав для выполнения этого действия'}, status=403)

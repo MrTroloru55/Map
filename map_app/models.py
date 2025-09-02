@@ -10,7 +10,8 @@ class MapObject(models.Model):
     # Геометрическое поле. GeometryField может хранить любой тип геометрии.
     geometry = models.GeometryField(srid=4326, verbose_name="Геометрия")
     photo_url = models.URLField(blank=True, null=True, verbose_name="URL фотографии")
-
+    trip_name = models.CharField(max_length=255, default='Поездка 1')
+    
     def __str__(self):
         return self.name if self.name else f'Объект #{self.pk}'
 
